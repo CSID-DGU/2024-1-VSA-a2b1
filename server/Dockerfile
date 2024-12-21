@@ -1,26 +1,22 @@
-FROM python:3.10
+FROM python:3.10-buster
 
-ENV POETRY_VERSION=1.6.1 \
-    POETRY_VIRTUALENVS_CREATE=false \
-    POETRY_NO_INTERACTION=1
+ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE 1
 
-WORKDIR /app
+WORKDIR /app/backend
 
-RUN apt-get update && apt-get install -y \
-    curl \
-    libgl1 \
-    libglib2.0-0 \
-    && curl -sSL https://install.python-poetry.org | python3 - \
-    && ln -s /root/.local/bin/poetry /usr/local/bin/poetry \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt /app/backend/
 
-COPY pyproject.toml poetry.lock /app/
-RUN poetry install --no-root --no-dev
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-COPY . /app
-COPY .env /app/.env
-COPY alembic.ini /app/alembic.ini
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-EXPOSE 8000
+COPY . /app/backend/
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
